@@ -1,10 +1,57 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { GuestDashboard } from '@/components/guest-dashboard'
 import { BalanceCard } from '@/components/balance-card'
 import { AddressCard } from '@/components/address-card'
 import { QuickActions } from '@/components/quick-actions'
 import { RecentTransactions } from '@/components/recent-transactions'
+import { LoginSignupPopup } from '@/components/login-signup-popup'
+import { getUser } from '@/lib/kv'
 import Image from 'next/image'
 
 export default function DashboardPage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [showLoginSignup, setShowLoginSignup] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+  const [userData, setUserData] = useState<any>(null)
+
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('userEmail')
+    if (storedEmail) {
+      setUserEmail(storedEmail)
+      setIsLoggedIn(true)
+      fetchUserData(storedEmail)
+    }
+  }, [])
+
+  const fetchUserData = async (email: string) => {
+    const user = await getUser(email)
+    if (user) {
+      setUserData(user)
+    }
+  }
+
+  const handleLogin = (email: string) => {
+    setUserEmail(email)
+    setIsLoggedIn(true)
+    localStorage.setItem('userEmail', email)
+    fetchUserData(email)
+  }
+
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    setUserEmail('')
+    setUserData(null)
+    localStorage.removeItem('userEmail')
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <GuestDashboard onLoginClick={() => setShowLoginSignup(true)} />
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center mb-6">
@@ -16,42 +63,49 @@ export default function DashboardPage() {
           className="mb-2"
           priority
         />
-        <div className="text-gray-400 text-sm">user@example.com</div>
+        <div className="text-gray-400 text-sm">{userEmail}</div>
       </div>
 
       <BalanceCard
         balances={[
           {
             title: "Naira Balance",
-            amount: 1236949.91,
+            amount: userData?.nairaBalance || 0,
             currency: "₦"
           },
           {
             title: "USD Balance",
-            amount: 2500.00,
+            amount: userData?.usdBalance || 0,
             currency: "$"
           },
           {
             title: "Crypto Balance (USD)",
-            amount: 0,
+            amount: userData?.cryptoBalance || 0,
             currency: "$",
-            comingSoon: true
+            comingSoon: !userData?.cryptoBalance
           }
         ]}
       />
 
       <AddressCard
-        address={{
-          street: "123 Main Street",
-          city: "Lagos",
-          state: "Lagos State",
-          postalCode: "100001",
-          country: "Nigeria"
+        address={userData?.address || {
+          street: "Not set",
+          city: "Not set",
+          state: "Not set",
+          postalCode: "Not set",
+          country: "Not set"
         }}
       />
 
-      <QuickActions />
-      <RecentTransactions />
+      <QuickActions isGuest={false} onLogout={handleLogout} />
+      <RecentTransactions transactions={userData?.recentTransactions || []} />
+
+      {showLoginSignup && (
+        <LoginSignupPopup 
+          onClose={() => setShowLoginSignup(false)} 
+          onLogin={handleLogin}
+        />
+      )}
     </div>
   )
 }
